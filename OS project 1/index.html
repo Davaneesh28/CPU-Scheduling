@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CalFuxk — CPU Scheduler</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav nav-light">
+    <div class="nav-inner">
+      <a href="#" class="logo" onclick="showPage('scheduler')">
+        <div class="logo-mark">CF</div>
+        <span class="logo-text">CalFuxk</span>
+      </a>
+      <div class="nav-links">
+        <a class="nav-link active" data-page="scheduler" onclick="showPage('scheduler')">Scheduler</a>
+        <a class="nav-link" data-page="about" onclick="showPage('about')">About Us</a>
+      </div>
+      <div class="nav-status">
+        <span class="status-pill">
+          <span class="pulse-dot"></span>
+          Live
+        </span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       PAGE: SCHEDULER
+  ═══════════════════════════════════════ -->
+  <div id="page-scheduler" class="page page-light active">
+
+    <!-- Hero heading -->
+    <header class="hero">
+      <h1 class="hero-title">Energy Efficient CPU Scheduler</h1>
+      <p class="hero-sub">ML-powered energy-efficient task scheduling with thermal awareness and real-time insights</p>
+    </header>
+
+    <div class="scheduler-layout">
+
+      <!-- LEFT: config + botty -->
+      <aside class="left-col">
+
+        <!-- Task config -->
+        <div class="card" id="configCard">
+          <h3 class="card-title">Task Setup</h3>
+
+          <div class="field">
+            <label class="label">Burst times <span class="label-hint">(ms, comma-separated)</span></label>
+            <div>
+              <input id="burst" type="text" class="input" placeholder="e.g. 5, 10, 3, 8, 6, 12, 2" autocomplete="off"/>
+              </div>
+            <p class="error-msg" id="error"></p>
+          </div>
+
+          <div class="field">
+            <label class="label">Algorithm</label>
+            <div class="algo-tabs">
+              <button class="algo-tab active" data-val="ml" onclick="selectAlgo(this)">
+                ML + DVFS
+                <span class="tab-badge">Recommended</span>
+              </button>
+              <button class="algo-tab" data-val="rr" onclick="selectAlgo(this)">Round Robin</button>
+              <button class="algo-tab" data-val="sjf" onclick="selectAlgo(this)">SJF</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Thermal limit <span class="label-hint">(°C)</span></label>
+            <input id="thermalLimit" type="number" class="input" value="75" min="50" max="100"/>
+          </div>
+
+          <button class="run-btn" id="runBtn" onclick="run()">
+            Run Scheduler
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Botty -->
+        <div class="card card-botty">
+          <div class="botty-header">
+            <div class="botty-avatar">B</div>
+            <div>
+              <div class="botty-name">Botty</div>
+              <div class="botty-status">
+                <span class="pulse-dot small"></span>
+                Online
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-window" id="chatWindow">
+            <div class="msg bot">
+              <div class="bubble bot-bubble">
+                Hi! I'm Botty, powered by CalFuxk. Run the scheduler first, then ask me anything about your results, energy efficiency, DVFS, thermal migration, or CPU scheduling algorithms.
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <input id="chatInput" class="chat-input" type="text" placeholder="Ask Botty something…" onkeydown="if(event.key==='Enter')sendChat()"/>
+            <button class="chat-send" onclick="sendChat()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- RIGHT: results -->
+      <section class="right-col">
+
+        <!-- Metrics -->
+        <div class="metrics-row" id="metricsRow">
+          <div class="metric-card" id="mc1">
+            <div class="metric-num" id="mTasks">—</div>
+            <div class="metric-label">Tasks</div>
+          </div>
+          <div class="metric-card" id="mc2">
+            <div class="metric-num orange" id="mEnergy">—</div>
+            <div class="metric-label">Total Energy</div>
+          </div>
+          <div class="metric-card" id="mc3">
+            <div class="metric-num green" id="mSaved">—</div>
+            <div class="metric-label">Energy Saved</div>
+          </div>
+          <div class="metric-card" id="mc4">
+            <div class="metric-num red" id="mTemp">—</div>
+            <div class="metric-label">Peak Temp</div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card">
+          <div class="card-top-row">
+            <h3 class="card-title">Results</h3>
+            <span class="algo-tag-display" id="algoDisplay">ML + DVFS</span>
+          </div>
+          <div class="table-scroll">
+            <table id="resultsTable">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Burst</th>
+                  <th>Core</th>
+                  <th>Frequency</th>
+                  <th>Temp</th>
+                  <th>Energy</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <div class="empty-icon">⚙️</div>
+                      <p>Enter burst times above and hit Run</p>
+                      <span class="empty-hint">Try: 5, 10, 3, 8, 6, 12, 2</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="two-col-charts" id="chartsRow" style="display:none">
+          <div class="card">
+            <h3 class="card-title">Gantt Chart</h3>
+            <div class="gantt-bar" id="ganttWrap"></div>
+            <div class="gantt-labels" id="ganttTimeline"></div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">Energy per Task</h3>
+            <div class="chart-canvas-wrap"><canvas id="energyChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Comparison -->
+        <div class="card" id="compCard" style="display:none">
+          <div class="card-top-row">
+            <h3 class="card-title">Baseline vs Optimized</h3>
+            <span class="savings-badge" id="savingsBadge"></span>
+          </div>
+          <p class="chart-desc"><strong>Baseline</strong> = every task on P-core at max 3200 MHz (no optimization). <strong>Optimized</strong> = NexCore's actual result using ML+DVFS+core selection. The gap between them is your energy savings.</p>
+          <div class="chart-canvas-wrap"><canvas id="compareChart"></canvas></div>
+        </div>
+        <!-- Frequency line chart -->
+        <div class="card" id="freqCard" style="display:none">
+          <h3 class="card-title">DVFS Frequency per Task</h3>
+          <p class="chart-desc">How the ML prediction drove clock speed selection. Higher predicted load → higher frequency.</p>
+          <div class="chart-canvas-wrap"><canvas id="freqChart"></canvas></div>
+        </div>
+        <!-- Temperature area chart -->
+        <div class="card" id="tempCard" style="display:none">
+          <h3 class="card-title">Core Temperature per Task</h3>
+          <p class="chart-desc">Simulated core temperature after each task. 🔥 Tasks that exceeded the thermal limit were migrated to alternate cores.</p>
+          <div class="chart-canvas-wrap"><canvas id="tempChart"></canvas></div>
+        </div>
+
+        <!-- Prediction -->
+        <div class="card" id="predCard" style="display:none">
+          <h3 class="card-title">ML Prediction</h3>
+          <div class="pred-grid" id="predBody"></div>
+        </div>
+
+      </section>
+
+    </div>
+  </div>
+
+    <!-- ═══════════════════════════════════════
+       PAGE: ABOUT
+  ═══════════════════════════════════════ -->
+  <div id="page-about" class="page page-dark">
+    <header class="hero">
+      <h1 class="hero-title">About CalFuxk</h1>
+      <p class="hero-sub">A research project at the intersection of operating systems, machine learning, and energy efficiency</p>
+    </header>
+
+    <div class="about-layout">
+
+      <div class="about-intro card">
+        <div class="about-logo-big">CF</div>
+        <div class="about-intro-text">
+          <h2>What is CalFuxk?</h2>
+          <p>CalFuxk is an intelligent CPU scheduling simulation system built to demonstrate how machine learning can make operating system scheduling decisions smarter and more energy-efficient. It combines classical OS scheduling algorithms with predictive ML models, dynamic hardware control (DVFS), and thermal management into a single, interactive platform.</p>
+          <p>The name is a nod to the chaotic complexity of modern processor scheduling — hundreds of tasks competing for nanoseconds of compute time, thermal constraints, voltage limits, and power budgets all colliding at once. CalFuxk tries to bring order to that chaos.</p>
+        </div>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon green">⚡</div>
+          <h4>Energy First</h4>
+          <p>Every scheduling decision is evaluated for its energy cost. Tasks are matched to cores and frequencies that minimize joules spent without sacrificing throughput.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon blue">🤖</div>
+          <h4>ML-Powered</h4>
+          <p>Linear regression runs on your burst time history to predict upcoming CPU demand. This drives proactive frequency scaling instead of reactive adjustment.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon orange">🌡</div>
+          <h4>Thermal Aware</h4>
+          <p>Core temperatures are modeled in real time. Tasks are migrated to cooler cores before throttling kicks in, keeping performance stable and hardware happy.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon purple">💬</div>
+          <h4>Botty Assistant</h4>
+          <p>Botty is a context-aware AI that understands your current scheduling results and gives specific, actionable advice about energy, thermals, and performance.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon red">📊</div>
+          <h4>Rich Visualization</h4>
+          <p>Gantt charts, energy bars, and before/after comparisons make it easy to see exactly what the optimizer did and why it helped.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon teal">🎓</div>
+          <h4>Built to Teach</h4>
+          <p>The Learning Center covers every concept used in the system — from Round Robin basics to the physics of dynamic power scaling — with real examples.</p>
+        </div>
+      </div>
+
+      <div class="tech-card card">
+        <h3>Technology Stack</h3>
+        <div class="tech-grid">
+          <div class="tech-item">
+            <span class="tech-dot"></span>
+            <div>
+              <strong>Frontend</strong>
+              <span>Vanilla HTML, CSS, JavaScript — no frameworks, no build tools</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <span class="tech-dot"></span>
+            <div>
+              <strong>ML Engine</strong>
+              <span>Ordinary Least Squares linear regression, implemented from scratch</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <span class="tech-dot"></span>
+            <div>
+              <strong>Scheduling</strong>
+              <span>ML+DVFS, Round Robin, and SJF algorithms with thermal modeling</span>
+            </div>
+          </div>
+         
+          <div class="tech-item">
+            <span class="tech-dot"></span>
+            <div>
+              <strong>Fonts</strong>
+              <span>DM Serif Display, DM Sans, DM Mono — Google Fonts</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <span class="tech-dot"></span>
+            <div>
+              <strong>Charts</strong>
+              <span>Pure CSS/HTML — no Chart.js, no D3, hand-crafted visuals</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="team-section">
+        <h3 class="section-heading">The Team</h3>
+        <div class="team-grid">
+
+          <div class="team-card">
+            <div class="team-avatar-wrap">
+              <!-- Replace src with actual photo path e.g. images/aryan.jpg -->
+              <img class="team-photo" src="images/member1.jpg"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"
+                alt="Aryan Chaudhary"/>
+              <div class="team-avatar" style="display:none;background:linear-gradient(135deg,#f59e0b,#d97706)">AC</div>
+            </div>
+            <div class="team-name">Davaneesh N</div>
+            <div class="team-role">Backend Developer · OS &amp; Scheduling</div>
+            <p>Designed the scheduling engine/ backend, ML integration, and thermal modeling. Obsessed with squeezing every last joule out of a processor.</p>
+          </div>
+
+          <div class="team-card">
+            <div class="team-avatar-wrap">
+              <img class="team-photo" src="images/member2.jpg"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"
+                alt="Priya Kapoor"/>
+              <div class="team-avatar" style="display:none;background:linear-gradient(135deg,#3b82f6,#1d4ed8)">PK</div>
+            </div>
+            <div class="team-name">Vivek Negi</div>
+            <div class="team-role">ML Aspirant · Prediction Models</div>
+            <p>Built the workload prediction pipeline and evaluated regression models. Also responsible for Botty's personality.</p>
+          </div>
+
+          <div class="team-card">
+            <div class="team-avatar-wrap">
+              <img class="team-photo" src="images/member3.jpg"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"
+                alt="Rahul Sharma"/>
+              <div class="team-avatar" style="display:none;background:linear-gradient(135deg,#10b981,#059669)">RS</div>
+            </div>
+            <div class="team-name">Anuj Thakur</div>
+            <div class="team-role">Frontend · Visualization</div>
+            <p>Created all charts and the overall UI design. Turns dry scheduling data into something people actually want to look at.</p>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/scheduler.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/chatbot.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
